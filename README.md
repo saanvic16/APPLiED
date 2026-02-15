@@ -93,13 +93,17 @@ You should see:
 
 ```bash
 curl -X POST http://127.0.0.1:5001/submit \
--H "Content-Type: application/json" \
--d '{
-    "name": "Alice",
-    "email": "alice@example.com",
-    "resume_text": "Worked at XYZ, skills in Python",
-    "jobs_wanted": "Backend, API"
-}'
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "johnd@example.com",
+    "resume_text": "Software engineer with interest in AI.",
+    "preferences": {
+      "locations": ["NYC", "Remote"],
+      "roles": ["Software Engineer", "ML Engineer"]
+    }
+  }'
 ```
 
 You should see (in terminal):
@@ -114,7 +118,7 @@ And you should also see two additional files appear.
 
 ---
 
-## 6. Fetch Remote Jobs from Remotive (tentative)
+## 6. Fetch Remote Jobs from [Remotive](https://github.com/remotive-com/remote-jobs-api) (tentative)
 
 **Step 1**: Fetch jobs and store them in the database + `jobs.json`:
 

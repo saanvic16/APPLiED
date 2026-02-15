@@ -45,49 +45,54 @@ def db_health():
 @app.route('/submit', methods=['POST'])
 def submit_user_info():
     data = request.json
-    name = data.get("name")
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
     email = data.get("email")
     resume_text = data.get("resume_text")
-    jobs_wanted = data.get("jobs_wanted")
+    preferences = data.get("preferences")  # e.g., job types or locations as JSON/dict
 
-    if not all([name, email]):
+    if not all([first_name, last_name, email]):
         return jsonify({
             "status": "failure",
-            "message": "Name and email are required",
+            "message": "First name, last name, and email are required",
             'timestamp': datetime.datetime.now().isoformat()
         }), 400
 
-    # --- WRITE FILES ---
-    # Save resume
-    if resume_text:
-        with open(f"{name.replace(' ', '_')}_resume.txt", "w") as f:
-            f.write(resume_text)
-
-    # Save jobs wanted
-    if jobs_wanted:
-        with open(f"{name.replace(' ', '_')}_jobs.json", "w") as f:
-            import json
-            # if jobs_wanted is a string, convert to list
-            if isinstance(jobs_wanted, str):
-                jobs_list = [job.strip() for job in jobs_wanted.split(",")]
-            else:
-                jobs_list = jobs_wanted
-            json.dump(jobs_list, f, indent=4)
-
-    # --- OPTIONAL: Save to DB ---
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
+
+        # 1️⃣ Insert into users
         cur.execute(
             """
-            INSERT INTO user_submissions (name, email, resume_text, jobs_wanted, created_at)
-            VALUES (%s, %s, %s, %s, NOW())
+            INSERT INTO users (id, email, first_name, last_name, created_at)
+            VALUES (gen_random_uuid(), %s, %s, %s, NOW())
+            RETURNING id
             """,
-            (name, email, resume_text, jobs_wanted)
+            (email, first_name, last_name)
         )
+        user_id = cur.fetchone()[0]
+
+        # 2️⃣ Insert into profiles
+        cur.execute(
+            """
+            INSERT INTO profiles (user_id, resume_text, preferences_json)
+            VALUES (%s, %s, %s)
+            """,
+            (user_id, resume_text, json.dumps(preferences) if preferences else '{}')
+        )
+
         conn.commit()
         cur.close()
         conn.close()
+
+        return jsonify({
+            "status": "success",
+            "message": "User and profile created successfully",
+            "user_id": str(user_id),
+            'timestamp': datetime.datetime.now().isoformat()
+        }), 201
+
     except Exception as e:
         return jsonify({
             "status": "failure",
@@ -95,22 +100,14 @@ def submit_user_info():
             'timestamp': datetime.datetime.now().isoformat()
         }), 500
 
-    return jsonify({
-        "status": "success",
-        "message": "User info submitted and files saved",
-        'timestamp': datetime.datetime.now().isoformat()
-    }), 201
-
 
 def fetch_jobs(limit=None):
-    """Fetch remote jobs from Remotive API and store in DB + JSON"""
     url = "https://remotive.com/api/remote-jobs"
     params = {}
     if limit:
         params["limit"] = limit
 
     response = requests.get(url, params=params)
-
     if response.status_code != 200:
         raise Exception(f"Remotive API returned {response.status_code}")
 
@@ -126,11 +123,23 @@ def fetch_jobs(limit=None):
         for job in jobs:
             cur.execute(
                 """
-                INSERT INTO jobs (id, title, company, category, url, created_at)
-                VALUES (%s, %s, %s, %s, %s, NOW())
-                ON CONFLICT (id) DO NOTHING
+                INSERT INTO job_postings (
+                    id, external_id, source, title, company, location, url, description, raw_json, ingested_at
+                ) VALUES (
+                    gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                )
+                ON CONFLICT (external_id, source) DO NOTHING
                 """,
-                (job["id"], job["title"], job["company_name"], job["category"], job["url"])
+                (
+                    job.get("id"),
+                    job.get("source_name", "Remotive"),  # example source
+                    job.get("title"),
+                    job.get("company_name"),
+                    job.get("category"),
+                    job.get("url"),
+                    job.get("description"),
+                    json.dumps(job)
+                )
             )
         conn.commit()
         cur.close()
@@ -140,6 +149,7 @@ def fetch_jobs(limit=None):
         print(f"Error saving to database: {e}")
 
     return len(jobs)
+
 
 
 @app.route('/fetch-jobs', methods=['GET'])
