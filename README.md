@@ -87,34 +87,38 @@ You should see:
 }
 ```
 
-**Step 3**: Submit User Into (with open for files)
-- <name>_resume.txt → contains the resume text
-- <name>_jobs.json → contains jobs wanted as a JSON array
+**Step 3**: POST Submit User Information
 
 ```bash
-curl -X POST http://127.0.0.1:5001/submit \
+curl -X POST http://127.0.0.1:5001/profiles \
   -H "Content-Type: application/json" \
   -d '{
-    "first_name": "John",
-    "last_name": "Doe",
-    "email": "johnd@example.com",
-    "resume_text": "Software engineer with interest in AI.",
-    "preferences": {
-      "locations": ["NYC", "Remote"],
-      "roles": ["Software Engineer", "ML Engineer"]
-    }
-  }'
+        "email": "randomuser123@testmail.com",
+        "first_name": "Alex",
+        "last_name": "Rivera",
+        "resume_text": "Software engineer with experience in Python, APIs, and distributed systems.",
+        "preferences": {
+            "location": "Chicago",
+            "job_type": "Backend Engineer",
+            "remote": false,
+            "salary_min": 90000
+        }
+      }'
 ```
 
 You should see (in terminal):
 ```bash
 {
   "status": "success",
-  "message": "User info submitted and files saved",
-  "timestamp": "2026-02-08T23:15:01.123456"
+  "message": "Profile saved",
+  "user_id": "9b4a6f2e-3c21-4a6a-9d1e-abc123456789",
+  "timestamp": "2026-02-17T..."
 }
 ```
-And you should also see two additional files appear.
+**Step 4**: GET Submit User Information
+```bash
+curl http://127.0.0.1:5001/profiles/PASTE-UUID-HERE
+```
 
 ---
 
